@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Centre Dashboard</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000000;
+            color: #e5e5e5;
+            /* Neutral warm black gradient */
+            background-image: radial-gradient(circle at 50% 0%, #1c1c1c 0%, #000000 85%);
+            min-height: 100vh;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #404040;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #525252;
+        }
+
+        /* Glassmorphism Utilities */
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.7); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+        }
+
+        .glass-card {
+            background: rgba(30, 30, 30, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.2s ease;
+        }
+        
+        .glass-card:hover {
+            background: rgba(45, 45, 45, 0.6);
+            border-color: rgba(255, 255, 255, 0.2); 
+            transform: translateY(-2px);
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Configuration & Data ---
+
+        const FINANCE_LINKS = {
+            sp500: "https://www.google.com/finance/quote/.INX:INDEXSP",
+            nasdaq: "https://www.google.com/finance/quote/.IXIC:INDEXNASDAQ",
+            nifty50: "https://www.google.com/finance/quote/NIFTY_50:INDEXNSE",
+            // FIXED: Updated Nifty 500 to use Google Finance URL
+            nifty500: "https://www.google.com/finance/quote/NIFTY_500:INDEXNSE",
+            gold: "https://www.google.com/finance/quote/GCW00:COMEX",
+            brent: "https://www.google.com/finance/quote/BZW00:NYMEX"
+        };
+
+        const RSS_SOURCES = {
+            world: [
+                // FIXED: Using standard stable NYT RSS feed
+                "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", 
+                "https://www.politico.com/rss/politicopicks.xml"
+            ],
+            india: [
+                "https://www.thehindu.com/news/national/feeder/default.rss",
+                "https://feeds.feedburner.com/ndtvnews-top-stories"
+            ],
+            tech: [
+                "https://www.theverge.com/rss/index.xml",
+                "https://www.wired.com/feed/rss"
+            ],
+            business: [
+                "https://rss.app/feeds/ImrcnhyfTybKkDuj.xml",
+                "https://www.moneycontrol.com/rss/latestnews.xml"
+            ]
+        };
+
+        // --- Helper Components ---
+
+        const Icon = ({ name, size = 18, className }) => {
+            const ref = useRef(null);
+
+            useEffect(() => {
+                if (!window.lucide) return;
+
+                const iconKey = name
+                    .split('-')
+                    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+                    .join('');
+                
+                const iconDefinition = window.lucide.icons[iconKey];
+
+                if (iconDefinition && ref.current) {
+                    ref.current.innerHTML = '';
+                    try {
+                        const svgElement = window.lucide.createElement(iconDefinition);
+                        svgElement.setAttribute('width', size);
+                        svgElement.setAttribute('height', size);
+                        
+                        const currentClass = svgElement.getAttribute('class') || '';
+                        const finalClass = className ? `${currentClass} ${className}` : currentClass;
+                        svgElement.setAttribute('class', finalClass.trim());
+
+                        ref.current.appendChild(svgElement);
+                    } catch (e) {
+                        console.error(`Failed to render icon: ${name}`, e);
+                    }
+                }
+            }, [name, size, className]);
+
+            return <span ref={ref} style={{ display: 'inline-flex', verticalAlign: 'middle' }}></span>;
+        };
+
+        const TickerCard = ({ title, symbol, price, change, isPositive, url }) => (
+            <div 
+                onClick={() => window.open(url, '_blank')}
+                className="glass-card rounded-2xl p-5 cursor-pointer flex flex-col justify-between h-32 group relative overflow-hidden"
+            >
+                <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Icon name="arrow-up-right" size={16} className="text-gray-400" />
+                </div>
+                
+                <div className="flex justify-between items-start">
+                    <div>
+                        <span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{symbol}</span>
+                        <h3 className="text-gray-100 font-semibold text-lg leading-tight mt-1">{title}</h3>
+                    </div>
+                </div>
+                
+                <div className="flex items-baseline gap-3 mt-auto">
+                    <span className="text-2xl font-bold tracking-tight text-white">{price.toLocaleString()}</span>
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1 ${isPositive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                        {isPositive ? <Icon name="trending-up" size={12} /> : <Icon name="trending-down" size={12} />}
+                        {Math.abs(change)}%
+                    </span>
+                </div>
+            </div>
+        );
+
+        const NewsSection = ({ title, type, sources, iconColorClass }) => {
+            const [news, setNews] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(false);
+            const mountedRef = useRef(true);
+
+            useEffect(() => {
+                mountedRef.current = true;
+
+                const fetchFeed = async () => {
+                    if (!mountedRef.current) return;
+                    setLoading(true);
+                    
+                    const fetchWithRetry = async (rssUrl) => {
+                        const timestamp = new Date().getTime();
+                        
+                        // IMPROVED STRATEGY: Rss2Json is now first priority as it's cleaner for React
+                        const strategies = [
+                            {
+                                name: 'Rss2Json',
+                                url: `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`,
+                                type: 'json_rss2json'
+                            },
+                            {
+                                name: 'CorsProxy',
+                                url: `https://corsproxy.io/?${encodeURIComponent(rssUrl)}`,
+                                type: 'xml'
+                            },
+                            {
+                                name: 'AllOrigins',
+                                url: `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}&t=${timestamp}`,
+                                type: 'json_contents'
+                            }
+                        ];
+
+                        for (const strategy of strategies) {
+                            try {
+                                const response = await fetch(strategy.url);
+                                if (!response.ok) continue;
+
+                                if (strategy.type === 'json_rss2json') {
+                                    const data = await response.json();
+                                    if(data.status === 'ok' && data.items) {
+                                        return data.items.map(item => ({
+                                            title: item.title,
+                                            link: item.link,
+                                            pubDate: item.pubDate,
+                                            source: new URL(rssUrl).hostname.replace('www.', '').split('.')[0]
+                                        })); // Return pre-parsed items
+                                    }
+                                }
+                                
+                                let xmlText = '';
+                                if (strategy.type === 'json_contents') {
+                                    const data = await response.json();
+                                    xmlText = data.contents;
+                                } else if (strategy.type === 'xml') {
+                                    xmlText = await response.text();
+                                }
+
+                                if (!xmlText || xmlText.length < 50) continue;
+                                return xmlText; // Return text for XML parsing
+                            } catch (e) {
+                                console.warn(`Strategy ${strategy.name} failed for ${rssUrl}`);
+                            }
+                        }
+                        return null; 
+                    };
+
+                    const promises = sources.map(async (url) => {
+                        const result = await fetchWithRetry(url);
+                        
+                        if (Array.isArray(result)) return result; // It was pre-parsed JSON
+
+                        if (result && typeof result === 'string') {
+                            try {
+                                const parser = new DOMParser();
+                                const xmlDoc = parser.parseFromString(result, "text/xml");
+                                const items = xmlDoc.querySelectorAll("item");
+                                return Array.from(items).map(item => ({
+                                    title: item.querySelector("title")?.textContent || "No Title",
+                                    link: item.querySelector("link")?.textContent || "#",
+                                    pubDate: item.querySelector("pubDate")?.textContent || "",
+                                    source: new URL(url).hostname.replace('www.', '').split('.')[0]
+                                }));
+                            } catch (parseErr) { return []; }
+                        }
+                        return [];
+                    });
+
+                    try {
+                        const results = await Promise.all(promises);
+                        const combined = results.flat().slice(0, 15);
+                        
+                        if (mountedRef.current) {
+                            setNews(combined);
+                            setError(combined.length === 0);
+                            setLoading(false);
+                        }
+                    } catch (err) {
+                        if (mountedRef.current) {
+                            setError(true);
+                            setLoading(false);
+                        }
+                    }
+                };
+
+                fetchFeed();
+                const interval = setInterval(fetchFeed, 300000); 
+                return () => { mountedRef.current = false; clearInterval(interval); };
+            }, [sources]);
+
+            let iconName = "globe";
+            if (type === 'india') iconName = "map-pin";
+            if (type === 'tech') iconName = "cpu";
+            if (type === 'business') iconName = "briefcase";
+
+            return (
+                <div className="glass-panel rounded-2xl flex flex-col h-[26rem] overflow-hidden">
+                    <div className="p-4 border-b border-white/10 flex items-center gap-3 bg-black/20">
+                        <div className={`p-2 bg-white/5 rounded-lg ${iconColorClass}`}>
+                            <Icon name={iconName} size={18} />
+                        </div>
+                        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-200">{title}</h2>
+                        {loading && <div className="ml-auto w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>}
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-2 scroll-smooth">
+                        {loading && news.length === 0 ? (
+                            <div className="p-4 space-y-4">
+                                {[1,2,3,4].map(i => (
+                                    <div key={i} className="animate-pulse flex gap-3">
+                                        <div className="h-10 w-1 rounded bg-gray-800"></div>
+                                        <div className="flex-1 space-y-2">
+                                            <div className="h-3 bg-gray-800 rounded w-3/4"></div>
+                                            <div className="h-2 bg-gray-800 rounded w-1/2"></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : error && news.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-gray-500 p-6 text-center">
+                                <Icon name="wifi-off" size={24} className="mb-2 opacity-50" />
+                                <p className="text-sm font-medium">Feed Unavailable</p>
+                                <p className="text-xs mt-1 opacity-70">Sources blocked connection</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-1">
+                                {news.map((item, idx) => (
+                                    <a 
+                                        key={idx} 
+                                        href={item.link} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="group block p-3 rounded-xl hover:bg-white/10 transition-all duration-200 animate-fade-in"
+                                        style={{animationDelay: `${idx * 0.05}s`}}
+                                    >
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <span className={`text-[9px] uppercase font-bold tracking-wider bg-white/5 px-1.5 py-0.5 rounded ${iconColorClass} opacity-80`}>
+                                                {item.source}
+                                            </span>
+                                        </div>
+                                        <h4 className="text-sm font-medium text-gray-300 group-hover:text-white leading-snug transition-colors">
+                                            {item.title}
+                                        </h4>
+                                    </a>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [marketData, setMarketData] = useState({
+                sp500: { price: 4783.45, change: 0.54, positive: true },
+                nasdaq: { price: 15055.65, change: -0.21, positive: false },
+                nifty50: { price: 21513.00, change: 0.89, positive: true },
+                nifty500: { price: 19420.50, change: 0.76, positive: true },
+                gold: { price: 2045.30, change: 0.12, positive: true },
+                brent: { price: 78.25, change: -1.45, positive: false },
+            });
+
+            // Simulate Live Ticking
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setMarketData(prev => {
+                        const newData = { ...prev };
+                        Object.keys(newData).forEach(key => {
+                            const volatility = 0.05; 
+                            const move = (Math.random() - 0.5) * volatility;
+                            const newPrice = newData[key].price * (1 + move / 100);
+                            
+                            let isPos = newData[key].positive;
+                            if(Math.random() > 0.95) isPos = !isPos;
+
+                            newData[key] = {
+                                ...newData[key],
+                                price: parseFloat(newPrice.toFixed(2)),
+                                positive: isPos
+                            };
+                        });
+                        return newData;
+                    });
+                }, 3000);
+                return () => clearInterval(interval);
+            }, []);
+
+            return (
+                <div className="min-h-screen p-4 lg:p-8 max-w-[1600px] mx-auto">
+                    {/* Header */}
+                    <header className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 px-2">
+                        <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 bg-white/10 rounded-xl flex items-center justify-center shadow-lg border border-white/5">
+                                <Icon name="activity" className="text-indigo-400" size={24} />
+                            </div>
+                            <div>
+                                <h1 className="text-3xl font-bold text-white tracking-tight">Control Centre</h1>
+                                <p className="text-gray-400 text-sm font-medium">Real-time Dashboard</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-6 text-sm font-medium text-gray-400 bg-white/5 px-4 py-2 rounded-full border border-white/5">
+                            <span className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                                Online
+                            </span>
+                            <span className="w-px h-5 bg-white/10"></span>
+                            <span>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                        </div>
+                    </header>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        
+                        {/* LEFT PANEL: Markets (35%) */}
+                        <div className="lg:col-span-4 flex flex-col gap-8">
+                            
+                            {/* Equities */}
+                            <section>
+                                <div className="flex items-center gap-2 mb-4 px-1">
+                                    <Icon name="bar-chart-2" className="text-blue-400" size={20} />
+                                    <h2 className="text-lg font-bold text-white">Equities</h2>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <TickerCard 
+                                        title="S&P 500" symbol="SPX" 
+                                        price={marketData.sp500.price} 
+                                        change={marketData.sp500.change} 
+                                        isPositive={marketData.sp500.positive}
+                                        url={FINANCE_LINKS.sp500}
+                                    />
+                                    <TickerCard 
+                                        title="NASDAQ" symbol="IXIC" 
+                                        price={marketData.nasdaq.price} 
+                                        change={marketData.nasdaq.change} 
+                                        isPositive={marketData.nasdaq.positive}
+                                        url={FINANCE_LINKS.nasdaq}
+                                    />
+                                    <TickerCard 
+                                        title="Nifty 50" symbol="NSE" 
+                                        price={marketData.nifty50.price} 
+                                        change={marketData.nifty50.change} 
+                                        isPositive={marketData.nifty50.positive}
+                                        url={FINANCE_LINKS.nifty50}
+                                    />
+                                    <TickerCard 
+                                        title="Nifty 500" symbol="NSE500" 
+                                        price={marketData.nifty500.price} 
+                                        change={marketData.nifty500.change} 
+                                        isPositive={marketData.nifty500.positive}
+                                        url={FINANCE_LINKS.nifty500}
+                                    />
+                                </div>
+                            </section>
+
+                            {/* Commodities */}
+                            <section>
+                                <div className="flex items-center gap-2 mb-4 px-1">
+                                    <Icon name="gem" className="text-amber-400" size={20} />
+                                    <h2 className="text-lg font-bold text-white">Commodities</h2>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <TickerCard 
+                                        title="Gold" symbol="XAU" 
+                                        price={marketData.gold.price} 
+                                        change={marketData.gold.change} 
+                                        isPositive={marketData.gold.positive}
+                                        url={FINANCE_LINKS.gold}
+                                    />
+                                    <TickerCard 
+                                        title="Brent Crude" symbol="BZ" 
+                                        price={marketData.brent.price} 
+                                        change={marketData.brent.change} 
+                                        isPositive={marketData.brent.positive}
+                                        url={FINANCE_LINKS.brent}
+                                    />
+                                </div>
+                            </section>
+
+                            {/* Interactive Hint */}
+                            <div className="mt-auto glass-panel p-4 rounded-xl flex items-start gap-3 text-sm text-gray-400">
+                                <Icon name="mouse-pointer-2" size={16} className="mt-0.5 text-white" />
+                                <p>Click any market card to view detailed historical charts and analytics on Google Finance.</p>
+                            </div>
+                        </div>
+
+                        {/* RIGHT PANEL: Feeds (65%) */}
+                        <div className="lg:col-span-8">
+                            <div className="flex items-center gap-2 mb-4 px-1">
+                                <Icon name="radio" className="text-rose-400" size={20} />
+                                <h2 className="text-lg font-bold text-white">Live Intelligence</h2>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <NewsSection 
+                                    title="Global Headlines" 
+                                    type="world" 
+                                    sources={RSS_SOURCES.world} 
+                                    iconColorClass="text-sky-400"
+                                />
+                                <NewsSection 
+                                    title="India Focus" 
+                                    type="india" 
+                                    sources={RSS_SOURCES.india} 
+                                    iconColorClass="text-orange-400"
+                                />
+                                <NewsSection 
+                                    title="Technology" 
+                                    type="tech" 
+                                    sources={RSS_SOURCES.tech} 
+                                    iconColorClass="text-violet-400"
+                                />
+                                <NewsSection 
+                                    title="Markets & Biz" 
+                                    type="business" 
+                                    sources={RSS_SOURCES.business} 
+                                    iconColorClass="text-emerald-400"
+                                />
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
