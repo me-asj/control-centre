@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,6 +14,18 @@
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -24,11 +36,21 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        /* Dark Mode Background */
+        .dark body {
             background-color: #000000;
             color: #e5e5e5;
-            /* Neutral warm black gradient */
             background-image: radial-gradient(circle at 50% 0%, #1c1c1c 0%, #000000 85%);
-            min-height: 100vh;
+        }
+
+        /* Light Mode Background */
+        body {
+            background-color: #f8fafc; /* Slate 50 */
+            color: #1e293b; /* Slate 800 */
+            background-image: radial-gradient(circle at 50% 0%, #e2e8f0 0%, #f8fafc 85%);
         }
         
         /* Custom Scrollbar */
@@ -36,42 +58,63 @@
             width: 6px;
         }
         ::-webkit-scrollbar-track {
-            background: #0a0a0a;
+            background: transparent;
         }
-        ::-webkit-scrollbar-thumb {
+        .dark ::-webkit-scrollbar-thumb {
             background: #404040;
             border-radius: 10px;
         }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
         ::-webkit-scrollbar-thumb:hover {
-            background: #525252;
+            background: #94a3b8;
         }
 
-        /* Glassmorphism Utilities */
+        /* Glassmorphism Utilities - Adaptive */
         .glass-panel {
-            background: rgba(20, 20, 20, 0.7); 
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
+            transition: background 0.3s ease, border 0.3s ease;
+        }
+        .dark .glass-panel {
+            background: rgba(20, 20, 20, 0.7); 
             border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
 
         .glass-card {
-            background: rgba(30, 30, 30, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.08);
             transition: all 0.2s ease;
         }
-        
-        .glass-card:hover {
+        .dark .glass-card {
+            background: rgba(30, 30, 30, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .dark .glass-card:hover {
             background: rgba(45, 45, 45, 0.6);
             border-color: rgba(255, 255, 255, 0.2); 
             transform: translateY(-2px);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(203, 213, 225, 0.4);
+        }
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: rgba(99, 102, 241, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
 
         .animate-fade-in {
             animation: fadeIn 0.5s ease-out;
         }
-        
-        /* Animation for Modal */
         .animate-scale-in {
             animation: scaleIn 0.2s ease-out forwards;
         }
@@ -80,7 +123,6 @@
             from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        
         @keyframes scaleIn {
             from { opacity: 0; transform: scale(0.95); }
             to { opacity: 1; transform: scale(1); }
@@ -106,20 +148,27 @@
 
         const RSS_SOURCES = {
             world: [
-                "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", 
-                "https://www.politico.com/rss/politicopicks.xml"
+                { name: "BBC", url: "https://feeds.bbci.co.uk/news/rss.xml" },
+                // FIXED: Switched to stable Politico RSS subdomain
+                { name: "Politico", url: "https://rss.politico.com/politics-news.xml" },
+                { name: "NYT", url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml" }
             ],
             india: [
-                "https://www.thehindu.com/news/national/feeder/default.rss",
-                "https://feeds.feedburner.com/ndtvnews-top-stories"
+                { name: "The Hindu", url: "https://www.thehindu.com/feeder/default.rss" },
+                // FIXED: Switched to main feed for better reliability
+                { name: "Indian Exp", url: "https://indianexpress.com/feed/" },
+                // FIXED: Switched to specific India News ID for TOI
+                { name: "TOI", url: "https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms" }
             ],
             tech: [
-                "https://www.theverge.com/rss/index.xml",
-                "https://www.wired.com/feed/rss"
+                { name: "Rest of World", url: "https://restofworld.org/feed/latest" },
+                { name: "TechCrunch", url: "https://techcrunch.com/feed/" },
+                { name: "MIT News", url: "https://news.mit.edu/rss/topic/science-technology-and-society" }
             ],
             business: [
-                "https://rss.app/feeds/ImrcnhyfTybKkDuj.xml",
-                "https://www.moneycontrol.com/rss/latestnews.xml"
+                { name: "CNBC TV18", url: "https://www.cnbctv18.com/commonfeeds/v1/cne/rss/business.xml" },
+                { name: "LiveMint", url: "https://www.livemint.com/rss/markets" },
+                { name: "CNBC", url: "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10001147" }
             ]
         };
 
@@ -130,12 +179,7 @@
 
             useEffect(() => {
                 if (!window.lucide) return;
-
-                const iconKey = name
-                    .split('-')
-                    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-                    .join('');
-                
+                const iconKey = name.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('');
                 const iconDefinition = window.lucide.icons[iconKey];
 
                 if (iconDefinition && ref.current) {
@@ -144,15 +188,11 @@
                         const svgElement = window.lucide.createElement(iconDefinition);
                         svgElement.setAttribute('width', size);
                         svgElement.setAttribute('height', size);
-                        
                         const currentClass = svgElement.getAttribute('class') || '';
                         const finalClass = className ? `${currentClass} ${className}` : currentClass;
                         svgElement.setAttribute('class', finalClass.trim());
-
                         ref.current.appendChild(svgElement);
-                    } catch (e) {
-                        console.error(`Failed to render icon: ${name}`, e);
-                    }
+                    } catch (e) { console.error(`Failed to render icon: ${name}`, e); }
                 }
             }, [name, size, className]);
 
@@ -165,19 +205,19 @@
                 className="glass-card rounded-2xl p-5 cursor-pointer flex flex-col justify-between h-32 group relative overflow-hidden"
             >
                 <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Icon name="arrow-up-right" size={16} className="text-gray-400" />
+                    <Icon name="arrow-up-right" size={16} className="text-slate-400 dark:text-gray-400" />
                 </div>
                 
                 <div className="flex justify-between items-start">
                     <div>
-                        <span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{symbol}</span>
-                        <h3 className="text-gray-100 font-semibold text-lg leading-tight mt-1">{title}</h3>
+                        <span className="text-slate-500 dark:text-gray-500 text-[10px] font-bold uppercase tracking-widest">{symbol}</span>
+                        <h3 className="text-slate-800 dark:text-gray-100 font-semibold text-lg leading-tight mt-1">{title}</h3>
                     </div>
                 </div>
                 
                 <div className="flex items-baseline gap-3 mt-auto">
-                    <span className="text-2xl font-bold tracking-tight text-white">{price.toLocaleString()}</span>
-                    <span className={`text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1 ${isPositive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                    <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{price.toLocaleString()}</span>
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1 ${isPositive ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'}`}>
                         {isPositive ? <Icon name="trending-up" size={12} /> : <Icon name="trending-down" size={12} />}
                         {Math.abs(change)}%
                     </span>
@@ -185,62 +225,72 @@
             </div>
         );
 
-        // Expanded Modal Component
         const FeedModal = ({ isOpen, onClose, title, items, iconColorClass }) => {
             if (!isOpen) return null;
 
+            // Improved 24h filter logic
+            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const recentItems = items.filter(item => {
+                const itemDate = item.pubDate ? new Date(item.pubDate) : null;
+                return !itemDate || isNaN(itemDate.getTime()) || itemDate > oneDayAgo;
+            });
+
+            // Fallback: If < 12 recent items found, fetch older items to fill the view.
+            const displayItems = recentItems.length < 12 ? items.slice(0, 30) : recentItems;
+            const showingFallback = recentItems.length < 12;
+
             return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 dark:bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}>
                     <div 
-                        className="glass-panel w-full max-w-4xl h-[85vh] flex flex-col rounded-2xl overflow-hidden animate-scale-in border border-white/10 shadow-2xl" 
+                        className="glass-panel w-full max-w-4xl h-[85vh] flex flex-col rounded-2xl overflow-hidden animate-scale-in shadow-2xl bg-white/90 dark:bg-black/40" 
                         onClick={e => e.stopPropagation()}
                     >
-                        {/* Modal Header */}
-                        <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/40">
+                        <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50/50 dark:bg-black/40">
                             <div>
-                                <h2 className="text-2xl font-bold text-white tracking-tight">{title}</h2>
-                                <p className="text-sm text-gray-400 mt-1">Extended Feed ({items.length} items)</p>
+                                <h2 className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">{title}</h2>
+                                <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">
+                                    {showingFallback ? 'Extended Feed' : 'Updates from last 24h'} ({displayItems.length} items)
+                                </p>
                             </div>
                             <button 
                                 onClick={onClose}
-                                className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white"
+                                className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white"
                             >
                                 <Icon name="x" size={24} />
                             </button>
                         </div>
 
-                        {/* Modal Content */}
-                        <div className="flex-1 overflow-y-auto p-6 scroll-smooth bg-black/20">
+                        <div className="flex-1 overflow-y-auto p-6 scroll-smooth bg-slate-100/50 dark:bg-black/20">
                             <div className="grid gap-3">
-                                {items.map((item, idx) => (
+                                {displayItems.map((item, idx) => (
                                     <a 
                                         key={idx} 
                                         href={item.link} 
                                         target="_blank" 
                                         rel="noopener noreferrer"
-                                        className="group p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all duration-200 flex flex-col sm:flex-row gap-4"
+                                        className="group p-4 rounded-xl bg-white dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 border border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/20 transition-all duration-200 flex flex-col sm:flex-row gap-4 shadow-sm hover:shadow-md"
                                     >
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-2">
-                                                <span className={`text-[10px] uppercase font-bold tracking-wider bg-black/40 px-2 py-1 rounded ${iconColorClass}`}>
+                                                <span className={`text-[10px] uppercase font-bold tracking-wider bg-slate-100 dark:bg-black/40 px-2 py-1 rounded ${iconColorClass}`}>
                                                     {item.source}
                                                 </span>
-                                                <span className="text-xs text-gray-500">
+                                                <span className="text-xs text-slate-500 dark:text-gray-500">
                                                     {item.pubDate ? new Date(item.pubDate).toLocaleString() : ''}
                                                 </span>
                                             </div>
-                                            <h4 className="text-lg font-medium text-gray-200 group-hover:text-white leading-snug transition-colors">
+                                            <h4 className="text-lg font-medium text-slate-800 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-white leading-snug transition-colors">
                                                 {item.title}
                                             </h4>
                                         </div>
                                         <div className="sm:self-center opacity-0 group-hover:opacity-100 transition-opacity -ml-2 sm:ml-0">
-                                            <Icon name="external-link" size={20} className="text-gray-400" />
+                                            <Icon name="external-link" size={20} className="text-slate-400 dark:text-gray-400" />
                                         </div>
                                     </a>
                                 ))}
                             </div>
-                            <div className="text-center mt-8 pb-4 text-sm text-gray-600">
-                                End of Stream
+                            <div className="text-center mt-8 pb-4 text-sm text-slate-500 dark:text-gray-600">
+                                {showingFallback ? "Showing recent items" : "End of 24h Cycle"}
                             </div>
                         </div>
                     </div>
@@ -262,25 +312,12 @@
                     if (!mountedRef.current) return;
                     setLoading(true);
                     
-                    const fetchWithRetry = async (rssUrl) => {
+                    const fetchWithRetry = async (sourceObj) => {
                         const timestamp = new Date().getTime();
-                        
                         const strategies = [
-                            {
-                                name: 'Rss2Json',
-                                url: `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&api_key=`, // Free tier usually works fine without key for limited use
-                                type: 'json_rss2json'
-                            },
-                            {
-                                name: 'CorsProxy',
-                                url: `https://corsproxy.io/?${encodeURIComponent(rssUrl)}`,
-                                type: 'xml'
-                            },
-                            {
-                                name: 'AllOrigins',
-                                url: `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}&t=${timestamp}`,
-                                type: 'json_contents'
-                            }
+                            { name: 'Rss2Json', url: `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(sourceObj.url)}`, type: 'json_rss2json' },
+                            { name: 'CorsProxy', url: `https://corsproxy.io/?${encodeURIComponent(sourceObj.url)}`, type: 'xml' },
+                            { name: 'AllOrigins', url: `https://api.allorigins.win/get?url=${encodeURIComponent(sourceObj.url)}&t=${timestamp}`, type: 'json_contents' }
                         ];
 
                         for (const strategy of strategies) {
@@ -295,7 +332,7 @@
                                             title: item.title,
                                             link: item.link,
                                             pubDate: item.pubDate,
-                                            source: new URL(rssUrl).hostname.replace('www.', '').split('.')[0]
+                                            source: sourceObj.name // Use explicit name
                                         }));
                                     }
                                 }
@@ -311,17 +348,15 @@
                                 if (!xmlText || xmlText.length < 50) continue;
                                 return xmlText;
                             } catch (e) {
-                                console.warn(`Strategy ${strategy.name} failed for ${rssUrl}`);
+                                console.warn(`Strategy ${strategy.name} failed for ${sourceObj.url}`);
                             }
                         }
                         return null; 
                     };
 
-                    const promises = sources.map(async (url) => {
-                        const result = await fetchWithRetry(url);
-                        
+                    const promises = sources.map(async (sourceObj) => {
+                        const result = await fetchWithRetry(sourceObj);
                         if (Array.isArray(result)) return result;
-
                         if (result && typeof result === 'string') {
                             try {
                                 const parser = new DOMParser();
@@ -331,7 +366,7 @@
                                     title: item.querySelector("title")?.textContent || "No Title",
                                     link: item.querySelector("link")?.textContent || "#",
                                     pubDate: item.querySelector("pubDate")?.textContent || "",
-                                    source: new URL(url).hostname.replace('www.', '').split('.')[0]
+                                    source: sourceObj.name // Use explicit name
                                 }));
                             } catch (parseErr) { return []; }
                         }
@@ -340,19 +375,15 @@
 
                     try {
                         const results = await Promise.all(promises);
-                        // Increase limit to 60 for expanded view
-                        const combined = results.flat().slice(0, 60);
-                        
+                        // Fetch plenty for filtered view
+                        const combined = results.flat().slice(0, 75); 
                         if (mountedRef.current) {
                             setNews(combined);
                             setError(combined.length === 0);
                             setLoading(false);
                         }
                     } catch (err) {
-                        if (mountedRef.current) {
-                            setError(true);
-                            setLoading(false);
-                        }
+                        if (mountedRef.current) { setError(true); setLoading(false); }
                     }
                 };
 
@@ -366,25 +397,24 @@
             if (type === 'tech') iconName = "cpu";
             if (type === 'business') iconName = "briefcase";
 
-            // Only show top 15 in the dashboard card
-            const displayedNews = news.slice(0, 15);
+            // Limit to top 10 for dashboard card
+            const displayedNews = news.slice(0, 10);
 
             return (
                 <>
                     <div className="glass-panel rounded-2xl flex flex-col h-[26rem] overflow-hidden group/panel">
-                        <div className="p-4 border-b border-white/10 flex items-center gap-3 bg-black/20">
-                            <div className={`p-2 bg-white/5 rounded-lg ${iconColorClass}`}>
+                        <div className="p-4 border-b border-slate-200 dark:border-white/10 flex items-center gap-3 bg-slate-50/50 dark:bg-black/20">
+                            <div className={`p-2 bg-white dark:bg-white/5 rounded-lg ${iconColorClass}`}>
                                 <Icon name={iconName} size={18} />
                             </div>
-                            <h2 className="text-sm font-bold uppercase tracking-wider text-gray-200">{title}</h2>
+                            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-gray-200">{title}</h2>
                             
                             <div className="ml-auto flex items-center gap-2">
-                                {loading && <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>}
+                                {loading && <div className="w-4 h-4 border-2 border-slate-300 dark:border-white/20 border-t-indigo-500 dark:border-t-white rounded-full animate-spin"></div>}
                                 
-                                {/* Maximize Button */}
                                 <button 
                                     onClick={() => setIsExpanded(true)}
-                                    className="p-1.5 rounded-md hover:bg-white/10 text-gray-500 hover:text-white transition-colors"
+                                    className="p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400 dark:text-gray-500 hover:text-slate-900 dark:hover:text-white transition-colors"
                                     title="Expand Feed"
                                 >
                                     <Icon name="maximize-2" size={16} />
@@ -395,18 +425,18 @@
                         <div className="flex-1 overflow-y-auto p-2 scroll-smooth">
                             {loading && news.length === 0 ? (
                                 <div className="p-4 space-y-4">
-                                    {[1,2,3,4].map(i => (
+                                    {[1,2,3].map(i => (
                                         <div key={i} className="animate-pulse flex gap-3">
-                                            <div className="h-10 w-1 rounded bg-gray-800"></div>
+                                            <div className="h-10 w-1 rounded bg-slate-200 dark:bg-gray-800"></div>
                                             <div className="flex-1 space-y-2">
-                                                <div className="h-3 bg-gray-800 rounded w-3/4"></div>
-                                                <div className="h-2 bg-gray-800 rounded w-1/2"></div>
+                                                <div className="h-3 bg-slate-200 dark:bg-gray-800 rounded w-3/4"></div>
+                                                <div className="h-2 bg-slate-200 dark:bg-gray-800 rounded w-1/2"></div>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : error && news.length === 0 ? (
-                                <div className="h-full flex flex-col items-center justify-center text-gray-500 p-6 text-center">
+                                <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-gray-500 p-6 text-center">
                                     <Icon name="wifi-off" size={24} className="mb-2 opacity-50" />
                                     <p className="text-sm font-medium">Feed Unavailable</p>
                                     <p className="text-xs mt-1 opacity-70">Sources blocked connection</p>
@@ -419,31 +449,30 @@
                                             href={item.link} 
                                             target="_blank" 
                                             rel="noopener noreferrer"
-                                            className="group block p-3 rounded-xl hover:bg-white/10 transition-all duration-200 animate-fade-in"
+                                            className="group block p-3 rounded-xl hover:bg-white/60 dark:hover:bg-white/10 transition-all duration-200 animate-fade-in"
                                             style={{animationDelay: `${idx * 0.05}s`}}
                                         >
                                             <div className="flex items-center gap-2 mb-1.5">
-                                                <span className={`text-[9px] uppercase font-bold tracking-wider bg-white/5 px-1.5 py-0.5 rounded ${iconColorClass} opacity-80`}>
+                                                <span className={`text-[9px] uppercase font-bold tracking-wider bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 rounded ${iconColorClass} opacity-80`}>
                                                     {item.source}
                                                 </span>
                                             </div>
-                                            <h4 className="text-sm font-medium text-gray-300 group-hover:text-white leading-snug transition-colors">
+                                            <h4 className="text-sm font-medium text-slate-700 dark:text-gray-300 group-hover:text-indigo-600 dark:group-hover:text-white leading-snug transition-colors">
                                                 {item.title}
                                             </h4>
                                         </a>
                                     ))}
                                     <button 
                                         onClick={() => setIsExpanded(true)}
-                                        className="w-full text-center py-3 text-xs text-gray-500 hover:text-white transition-colors uppercase tracking-widest font-bold hover:bg-white/5 rounded-lg mt-2"
+                                        className="w-full text-center py-3 text-xs text-slate-500 dark:text-gray-500 hover:text-slate-900 dark:hover:text-white transition-colors uppercase tracking-widest font-bold hover:bg-slate-200 dark:hover:bg-white/5 rounded-lg mt-2"
                                     >
-                                        View More
+                                        View Full Feed
                                     </button>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Render Modal */}
                     <FeedModal 
                         isOpen={isExpanded} 
                         onClose={() => setIsExpanded(false)} 
@@ -465,7 +494,16 @@
                 brent: { price: 78.25, change: -1.45, positive: false },
             });
 
-            // Simulate Live Ticking
+            const [isDark, setIsDark] = useState(true);
+
+            useEffect(() => {
+                if (isDark) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            }, [isDark]);
+
             useEffect(() => {
                 const interval = setInterval(() => {
                     setMarketData(prev => {
@@ -474,10 +512,8 @@
                             const volatility = 0.05; 
                             const move = (Math.random() - 0.5) * volatility;
                             const newPrice = newData[key].price * (1 + move / 100);
-                            
                             let isPos = newData[key].positive;
                             if(Math.random() > 0.95) isPos = !isPos;
-
                             newData[key] = {
                                 ...newData[key],
                                 price: parseFloat(newPrice.toFixed(2)),
@@ -491,38 +527,45 @@
             }, []);
 
             return (
-                <div className="min-h-screen p-4 lg:p-8 max-w-[1600px] mx-auto">
-                    {/* Header */}
+                <div className="min-h-screen p-4 lg:p-8 max-w-[1600px] mx-auto transition-colors duration-300">
                     <header className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 px-2">
                         <div className="flex items-center gap-4">
-                            <div className="h-12 w-12 bg-white/10 rounded-xl flex items-center justify-center shadow-lg border border-white/5">
-                                <Icon name="activity" className="text-indigo-400" size={24} />
+                            <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-lg border border-slate-200 dark:bg-white/10 dark:border-white/5">
+                                <Icon name="activity" className="text-indigo-600 dark:text-indigo-400" size={24} />
                             </div>
                             <div>
-                                <h1 className="text-3xl font-bold text-white tracking-tight">Control Centre</h1>
-                                <p className="text-gray-400 text-sm font-medium">Real-time Dashboard</p>
+                                <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Control Centre</h1>
+                                <p className="text-slate-500 dark:text-gray-400 text-sm font-medium">Real-time Dashboard</p>
                             </div>
                         </div>
-                        <div className="flex gap-6 text-sm font-medium text-gray-400 bg-white/5 px-4 py-2 rounded-full border border-white/5">
-                            <span className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-                                Online
-                            </span>
-                            <span className="w-px h-5 bg-white/10"></span>
-                            <span>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                        
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={() => setIsDark(!isDark)}
+                                className="p-2.5 rounded-full bg-white border border-slate-200 shadow-sm hover:shadow-md dark:bg-white/10 dark:border-white/5 dark:hover:bg-white/20 transition-all text-slate-600 dark:text-yellow-300"
+                                title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                            >
+                                {isDark ? <Icon name="sun" size={20} /> : <Icon name="moon" size={20} className="text-indigo-600" />}
+                            </button>
+
+                            <div className="hidden sm:flex gap-6 text-sm font-medium text-slate-500 dark:text-gray-400 bg-white dark:bg-white/5 px-4 py-2 rounded-full border border-slate-200 dark:border-white/5 shadow-sm">
+                                <span className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                                    Online
+                                </span>
+                                <span className="w-px h-5 bg-slate-200 dark:bg-white/10"></span>
+                                <span>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                            </div>
                         </div>
                     </header>
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                         
-                        {/* LEFT PANEL: Markets (35%) */}
                         <div className="lg:col-span-4 flex flex-col gap-8">
-                            
-                            {/* Equities */}
                             <section>
                                 <div className="flex items-center gap-2 mb-4 px-1">
-                                    <Icon name="bar-chart-2" className="text-blue-400" size={20} />
-                                    <h2 className="text-lg font-bold text-white">Equities</h2>
+                                    <Icon name="bar-chart-2" className="text-blue-500 dark:text-blue-400" size={20} />
+                                    <h2 className="text-lg font-bold text-slate-800 dark:text-white">Equities</h2>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <TickerCard 
@@ -556,11 +599,10 @@
                                 </div>
                             </section>
 
-                            {/* Commodities */}
                             <section>
                                 <div className="flex items-center gap-2 mb-4 px-1">
-                                    <Icon name="gem" className="text-amber-400" size={20} />
-                                    <h2 className="text-lg font-bold text-white">Commodities</h2>
+                                    <Icon name="gem" className="text-amber-500 dark:text-amber-400" size={20} />
+                                    <h2 className="text-lg font-bold text-slate-800 dark:text-white">Commodities</h2>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <TickerCard 
@@ -580,43 +622,41 @@
                                 </div>
                             </section>
 
-                            {/* Interactive Hint */}
-                            <div className="mt-auto glass-panel p-4 rounded-xl flex items-start gap-3 text-sm text-gray-400">
-                                <Icon name="mouse-pointer-2" size={16} className="mt-0.5 text-white" />
+                            <div className="mt-auto glass-panel p-4 rounded-xl flex items-start gap-3 text-sm text-slate-500 dark:text-gray-400">
+                                <Icon name="mouse-pointer-2" size={16} className="mt-0.5 text-indigo-500 dark:text-white" />
                                 <p>Click any market card to view detailed historical charts and analytics on Google Finance.</p>
                             </div>
                         </div>
 
-                        {/* RIGHT PANEL: Feeds (65%) */}
                         <div className="lg:col-span-8">
                             <div className="flex items-center gap-2 mb-4 px-1">
-                                <Icon name="radio" className="text-rose-400" size={20} />
-                                <h2 className="text-lg font-bold text-white">Live Intelligence</h2>
+                                <Icon name="radio" className="text-rose-500 dark:text-rose-400" size={20} />
+                                <h2 className="text-lg font-bold text-slate-800 dark:text-white">Live Intelligence</h2>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <NewsSection 
                                     title="Global Headlines" 
                                     type="world" 
                                     sources={RSS_SOURCES.world} 
-                                    iconColorClass="text-sky-400"
+                                    iconColorClass="text-sky-600 dark:text-sky-400"
                                 />
                                 <NewsSection 
                                     title="India Focus" 
                                     type="india" 
                                     sources={RSS_SOURCES.india} 
-                                    iconColorClass="text-orange-400"
+                                    iconColorClass="text-orange-600 dark:text-orange-400"
                                 />
                                 <NewsSection 
                                     title="Technology" 
                                     type="tech" 
                                     sources={RSS_SOURCES.tech} 
-                                    iconColorClass="text-violet-400"
+                                    iconColorClass="text-violet-600 dark:text-violet-400"
                                 />
                                 <NewsSection 
                                     title="Markets & Biz" 
                                     type="business" 
                                     sources={RSS_SOURCES.business} 
-                                    iconColorClass="text-emerald-400"
+                                    iconColorClass="text-emerald-600 dark:text-emerald-400"
                                 />
                             </div>
                         </div>
