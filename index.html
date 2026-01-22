@@ -133,31 +133,19 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, memo } = React;
 
         // --- Configuration & Data ---
-
-        const FINANCE_LINKS = {
-            sp500: "https://www.google.com/finance/quote/.INX:INDEXSP",
-            nasdaq: "https://www.google.com/finance/quote/.IXIC:INDEXNASDAQ",
-            nifty50: "https://www.google.com/finance/quote/NIFTY_50:INDEXNSE",
-            nifty500: "https://www.google.com/finance/quote/NIFTY_500:INDEXNSE",
-            gold: "https://www.google.com/finance/quote/GCW00:COMEX",
-            brent: "https://www.google.com/finance/quote/BZW00:NYMEX"
-        };
 
         const RSS_SOURCES = {
             world: [
                 { name: "BBC", url: "https://feeds.bbci.co.uk/news/rss.xml" },
-                // FIXED: Switched to stable Politico RSS subdomain
                 { name: "Politico", url: "https://rss.politico.com/politics-news.xml" },
                 { name: "NYT", url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml" }
             ],
             india: [
                 { name: "The Hindu", url: "https://www.thehindu.com/feeder/default.rss" },
-                // FIXED: Switched to main feed for better reliability
-                { name: "Indian Exp", url: "https://indianexpress.com/feed/" },
-                // FIXED: Switched to specific India News ID for TOI
+                { name: "Indian Exp", url: "https://indianexpress.com/section/india/feed/" },
                 { name: "TOI", url: "https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms" }
             ],
             tech: [
@@ -199,43 +187,93 @@
             return <span ref={ref} style={{ display: 'inline-flex', verticalAlign: 'middle' }}></span>;
         };
 
-        const TickerCard = ({ title, symbol, price, change, isPositive, url }) => (
+        const CustomIcons = {
+            GoogleFinance: () => (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 3v18h18" />
+                    <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" />
+                </svg>
+            )
+        };
+
+        // Live TradingView Widget - Optimized with memo and Click Overlay
+        const TradingViewWidget = memo(({ symbol, theme }) => {
+            const container = useRef();
+
+            useEffect(() => {
+                if (!container.current) return;
+                
+                container.current.innerHTML = '';
+
+                const script = document.createElement("script");
+                script.src = "https://s3.tradingview.com/external-embedding/embed-widget-single-quote.js";
+                script.type = "text/javascript";
+                script.async = true;
+                script.innerHTML = JSON.stringify({
+                    "symbol": symbol,
+                    "width": "100%",
+                    "colorTheme": theme,
+                    "isTransparent": true,
+                    "locale": "en"
+                });
+                
+                container.current.appendChild(script);
+            }, [symbol, theme]);
+
+            // Construct Link for deep dive
+            const [exchange, ticker] = symbol.split(':');
+            const targetUrl = `https://www.tradingview.com/symbols/${ticker}/?exchange=${exchange}`;
+
+            return (
+                <div className="relative group">
+                    <div 
+                        className="glass-card rounded-2xl h-32 flex items-center justify-center overflow-hidden border border-slate-200 dark:border-white/10" 
+                        ref={container}
+                    >
+                    </div>
+                    {/* Click Overlay */}
+                    <a 
+                        href={targetUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="absolute inset-0 z-10 cursor-pointer rounded-2xl ring-2 ring-transparent group-hover:ring-indigo-500/50 transition-all"
+                        title="Click for deep dive on TradingView"
+                    ></a>
+                </div>
+            );
+        });
+
+        // Improved Circular Link Tile
+        const CircularLink = ({ title, url, iconName, customIcon, iconColorClass }) => (
             <div 
                 onClick={() => window.open(url, '_blank')}
-                className="glass-card rounded-2xl p-5 cursor-pointer flex flex-col justify-between h-32 group relative overflow-hidden"
+                className="group flex flex-col items-center gap-2 cursor-pointer p-2 rounded-xl transition-all duration-300 w-24"
             >
-                <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Icon name="arrow-up-right" size={16} className="text-slate-400 dark:text-gray-400" />
-                </div>
-                
-                <div className="flex justify-between items-start">
-                    <div>
-                        <span className="text-slate-500 dark:text-gray-500 text-[10px] font-bold uppercase tracking-widest">{symbol}</span>
-                        <h3 className="text-slate-800 dark:text-gray-100 font-semibold text-lg leading-tight mt-1">{title}</h3>
+                <div className="relative">
+                    <div className={`w-14 h-14 rounded-full flex items-center justify-center bg-slate-100 dark:bg-white/10 group-hover:scale-110 transition-transform duration-300 border border-slate-200 dark:border-white/10 group-hover:border-indigo-500/50 shadow-md ${iconColorClass}`}>
+                        {customIcon ? customIcon : <Icon name={iconName} size={24} strokeWidth={2.5} />}
+                    </div>
+                    {/* Arrow Badge */}
+                    <div className="absolute -top-1 -right-1 bg-indigo-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md scale-75">
+                       <Icon name="arrow-right" size={10} />
                     </div>
                 </div>
-                
-                <div className="flex items-baseline gap-3 mt-auto">
-                    <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{price.toLocaleString()}</span>
-                    <span className={`text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1 ${isPositive ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'}`}>
-                        {isPositive ? <Icon name="trending-up" size={12} /> : <Icon name="trending-down" size={12} />}
-                        {Math.abs(change)}%
-                    </span>
-                </div>
+                {/* High Contrast Label */}
+                <span className="text-xs font-bold text-center text-slate-900 dark:text-white leading-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors w-full break-words">
+                    {title}
+                </span>
             </div>
         );
 
         const FeedModal = ({ isOpen, onClose, title, items, iconColorClass }) => {
             if (!isOpen) return null;
 
-            // Improved 24h filter logic
             const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
             const recentItems = items.filter(item => {
                 const itemDate = item.pubDate ? new Date(item.pubDate) : null;
                 return !itemDate || isNaN(itemDate.getTime()) || itemDate > oneDayAgo;
             });
 
-            // Fallback: If < 12 recent items found, fetch older items to fill the view.
             const displayItems = recentItems.length < 12 ? items.slice(0, 30) : recentItems;
             const showingFallback = recentItems.length < 12;
 
@@ -332,7 +370,7 @@
                                             title: item.title,
                                             link: item.link,
                                             pubDate: item.pubDate,
-                                            source: sourceObj.name // Use explicit name
+                                            source: sourceObj.name 
                                         }));
                                     }
                                 }
@@ -366,7 +404,7 @@
                                     title: item.querySelector("title")?.textContent || "No Title",
                                     link: item.querySelector("link")?.textContent || "#",
                                     pubDate: item.querySelector("pubDate")?.textContent || "",
-                                    source: sourceObj.name // Use explicit name
+                                    source: sourceObj.name 
                                 }));
                             } catch (parseErr) { return []; }
                         }
@@ -375,8 +413,19 @@
 
                     try {
                         const results = await Promise.all(promises);
-                        // Fetch plenty for filtered view
-                        const combined = results.flat().slice(0, 75); 
+                        let combined = results.flat();
+                        
+                        // Sort by publishing date (Newest First)
+                        combined.sort((a, b) => {
+                            const dateA = new Date(a.pubDate);
+                            const dateB = new Date(b.pubDate);
+                            if (isNaN(dateA.getTime())) return 1;
+                            if (isNaN(dateB.getTime())) return -1;
+                            return dateB - dateA;
+                        });
+
+                        combined = combined.slice(0, 75); 
+                        
                         if (mountedRef.current) {
                             setNews(combined);
                             setError(combined.length === 0);
@@ -397,7 +446,6 @@
             if (type === 'tech') iconName = "cpu";
             if (type === 'business') iconName = "briefcase";
 
-            // Limit to top 10 for dashboard card
             const displayedNews = news.slice(0, 10);
 
             return (
@@ -485,16 +533,41 @@
         };
 
         const App = () => {
-            const [marketData, setMarketData] = useState({
-                sp500: { price: 4783.45, change: 0.54, positive: true },
-                nasdaq: { price: 15055.65, change: -0.21, positive: false },
-                nifty50: { price: 21513.00, change: 0.89, positive: true },
-                nifty500: { price: 19420.50, change: 0.76, positive: true },
-                gold: { price: 2045.30, change: 0.12, positive: true },
-                brent: { price: 78.25, change: -1.45, positive: false },
-            });
-
             const [isDark, setIsDark] = useState(true);
+            
+            // Favourites State with Updated Icons
+            const [equityFavs, setEquityFavs] = useState([
+                { id: 'nifty50', title: 'Nifty 50', url: 'https://www.google.com/finance/quote/NIFTY_50:INDEXNSE', icon: 'trending-up' },
+                { id: 'nifty500', title: 'Nifty 500', url: 'https://www.google.com/finance/quote/NIFTY_500:INDEXNSE', icon: 'indian-rupee' }
+            ]);
+            const [commodityFavs, setCommodityFavs] = useState([
+                { id: 'silver', title: 'Silver', url: 'https://www.google.com/finance/quote/SIW00:COMEX', icon: 'sparkles' },
+                { id: 'copper', title: 'Copper', url: 'https://www.google.com/finance/quote/HG1:COMEX', icon: 'zap' }
+            ]);
+
+            useEffect(() => {
+                const savedEquities = localStorage.getItem('equityFavs');
+                if (savedEquities) {
+                    const parsed = JSON.parse(savedEquities);
+                    // Force update if old Nifty 50 icon configuration is present
+                    if (parsed.length > 0 && parsed[0].id === 'nifty50' && parsed[0].component === 'Nifty') {
+                        // Keep state default (which has new trending-up icon)
+                    } else {
+                        setEquityFavs(parsed);
+                    }
+                }
+                
+                const savedCommodities = localStorage.getItem('commodityFavs');
+                if (savedCommodities) {
+                    const parsed = JSON.parse(savedCommodities);
+                    setCommodityFavs(parsed);
+                }
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('equityFavs', JSON.stringify(equityFavs));
+                localStorage.setItem('commodityFavs', JSON.stringify(commodityFavs));
+            }, [equityFavs, commodityFavs]);
 
             useEffect(() => {
                 if (isDark) {
@@ -504,27 +577,7 @@
                 }
             }, [isDark]);
 
-            useEffect(() => {
-                const interval = setInterval(() => {
-                    setMarketData(prev => {
-                        const newData = { ...prev };
-                        Object.keys(newData).forEach(key => {
-                            const volatility = 0.05; 
-                            const move = (Math.random() - 0.5) * volatility;
-                            const newPrice = newData[key].price * (1 + move / 100);
-                            let isPos = newData[key].positive;
-                            if(Math.random() > 0.95) isPos = !isPos;
-                            newData[key] = {
-                                ...newData[key],
-                                price: parseFloat(newPrice.toFixed(2)),
-                                positive: isPos
-                            };
-                        });
-                        return newData;
-                    });
-                }, 3000);
-                return () => clearInterval(interval);
-            }, []);
+            const widgetTheme = isDark ? "dark" : "light";
 
             return (
                 <div className="min-h-screen p-4 lg:p-8 max-w-[1600px] mx-auto transition-colors duration-300">
@@ -561,40 +614,38 @@
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                         
+                        {/* LEFT PANEL: Markets */}
                         <div className="lg:col-span-4 flex flex-col gap-8">
+                            
                             <section>
                                 <div className="flex items-center gap-2 mb-4 px-1">
                                     <Icon name="bar-chart-2" className="text-blue-500 dark:text-blue-400" size={20} />
                                     <h2 className="text-lg font-bold text-slate-800 dark:text-white">Equities</h2>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <TickerCard 
-                                        title="S&P 500" symbol="SPX" 
-                                        price={marketData.sp500.price} 
-                                        change={marketData.sp500.change} 
-                                        isPositive={marketData.sp500.positive}
-                                        url={FINANCE_LINKS.sp500}
-                                    />
-                                    <TickerCard 
-                                        title="NASDAQ" symbol="IXIC" 
-                                        price={marketData.nasdaq.price} 
-                                        change={marketData.nasdaq.change} 
-                                        isPositive={marketData.nasdaq.positive}
-                                        url={FINANCE_LINKS.nasdaq}
-                                    />
-                                    <TickerCard 
-                                        title="Nifty 50" symbol="NSE" 
-                                        price={marketData.nifty50.price} 
-                                        change={marketData.nifty50.change} 
-                                        isPositive={marketData.nifty50.positive}
-                                        url={FINANCE_LINKS.nifty50}
-                                    />
-                                    <TickerCard 
-                                        title="Nifty 500" symbol="NSE500" 
-                                        price={marketData.nifty500.price} 
-                                        change={marketData.nifty500.change} 
-                                        isPositive={marketData.nifty500.positive}
-                                        url={FINANCE_LINKS.nifty500}
+                                
+                                {/* TradingView Widgets */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                    <TradingViewWidget symbol="FOREXCOM:SPXUSD" theme={widgetTheme} />
+                                    <TradingViewWidget symbol="NASDAQ:IXIC" theme={widgetTheme} />
+                                </div>
+
+                                {/* Favourite Links - Circular Design */}
+                                <div className="flex flex-wrap gap-4 px-2">
+                                    {equityFavs.map(item => (
+                                        <CircularLink 
+                                            key={item.id}
+                                            title={item.title} 
+                                            url={item.url}
+                                            iconName={item.icon}
+                                            iconColorClass="text-blue-600 dark:text-blue-400"
+                                        />
+                                    ))}
+                                    {/* Dedicated Google Finance Button */}
+                                    <CircularLink 
+                                        title="Google Finance"
+                                        url="https://www.google.com/finance"
+                                        customIcon={<CustomIcons.GoogleFinance />}
+                                        iconColorClass="text-slate-500 dark:text-slate-300"
                                     />
                                 </div>
                             </section>
@@ -604,50 +655,61 @@
                                     <Icon name="gem" className="text-amber-500 dark:text-amber-400" size={20} />
                                     <h2 className="text-lg font-bold text-slate-800 dark:text-white">Commodities</h2>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <TickerCard 
-                                        title="Gold" symbol="XAU" 
-                                        price={marketData.gold.price} 
-                                        change={marketData.gold.change} 
-                                        isPositive={marketData.gold.positive}
-                                        url={FINANCE_LINKS.gold}
-                                    />
-                                    <TickerCard 
-                                        title="Brent Crude" symbol="BZ" 
-                                        price={marketData.brent.price} 
-                                        change={marketData.brent.change} 
-                                        isPositive={marketData.brent.positive}
-                                        url={FINANCE_LINKS.brent}
+                                
+                                {/* TradingView Widgets */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                    <TradingViewWidget symbol="TVC:GOLD" theme={widgetTheme} />
+                                    <TradingViewWidget symbol="TVC:UKOIL" theme={widgetTheme} />
+                                </div>
+
+                                {/* Favourite Links - Circular Design */}
+                                <div className="flex flex-wrap gap-4 px-2">
+                                    {commodityFavs.map(item => (
+                                        <CircularLink 
+                                            key={item.id}
+                                            title={item.title} 
+                                            url={item.url}
+                                            iconName={item.icon || 'arrow-up-right'}
+                                            iconColorClass="text-amber-600 dark:text-amber-400"
+                                        />
+                                    ))}
+                                    {/* Dedicated Google Finance Button for Commodities */}
+                                    <CircularLink 
+                                        title="Google Finance"
+                                        url="https://www.google.com/finance"
+                                        customIcon={<CustomIcons.GoogleFinance />}
+                                        iconColorClass="text-slate-500 dark:text-slate-300"
                                     />
                                 </div>
                             </section>
 
                             <div className="mt-auto glass-panel p-4 rounded-xl flex items-start gap-3 text-sm text-slate-500 dark:text-gray-400">
                                 <Icon name="mouse-pointer-2" size={16} className="mt-0.5 text-indigo-500 dark:text-white" />
-                                <p>Click any market card to view detailed historical charts and analytics on Google Finance.</p>
+                                <p>Mixed data: TradingView live widgets & quick access buttons.</p>
                             </div>
                         </div>
 
+                        {/* RIGHT PANEL: Feeds (65%) */}
                         <div className="lg:col-span-8">
                             <div className="flex items-center gap-2 mb-4 px-1">
                                 <Icon name="radio" className="text-rose-500 dark:text-rose-400" size={20} />
-                                <h2 className="text-lg font-bold text-slate-800 dark:text-white">Live Intelligence</h2>
+                                <h2 className="text-lg font-bold text-slate-800 dark:text-white">News</h2>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <NewsSection 
-                                    title="Global Headlines" 
+                                    title="Global" 
                                     type="world" 
                                     sources={RSS_SOURCES.world} 
                                     iconColorClass="text-sky-600 dark:text-sky-400"
                                 />
                                 <NewsSection 
-                                    title="India Focus" 
+                                    title="India" 
                                     type="india" 
                                     sources={RSS_SOURCES.india} 
                                     iconColorClass="text-orange-600 dark:text-orange-400"
                                 />
                                 <NewsSection 
-                                    title="Technology" 
+                                    title="Tech" 
                                     type="tech" 
                                     sources={RSS_SOURCES.tech} 
                                     iconColorClass="text-violet-600 dark:text-violet-400"
