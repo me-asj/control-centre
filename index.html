@@ -70,10 +70,20 @@
         .animate-fade-in {
             animation: fadeIn 0.5s ease-out;
         }
+        
+        /* Animation for Modal */
+        .animate-scale-in {
+            animation: scaleIn 0.2s ease-out forwards;
+        }
 
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
         }
     </style>
 </head>
@@ -89,7 +99,6 @@
             sp500: "https://www.google.com/finance/quote/.INX:INDEXSP",
             nasdaq: "https://www.google.com/finance/quote/.IXIC:INDEXNASDAQ",
             nifty50: "https://www.google.com/finance/quote/NIFTY_50:INDEXNSE",
-            // FIXED: Updated Nifty 500 to use Google Finance URL
             nifty500: "https://www.google.com/finance/quote/NIFTY_500:INDEXNSE",
             gold: "https://www.google.com/finance/quote/GCW00:COMEX",
             brent: "https://www.google.com/finance/quote/BZW00:NYMEX"
@@ -97,7 +106,6 @@
 
         const RSS_SOURCES = {
             world: [
-                // FIXED: Using standard stable NYT RSS feed
                 "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", 
                 "https://www.politico.com/rss/politicopicks.xml"
             ],
@@ -177,10 +185,74 @@
             </div>
         );
 
+        // Expanded Modal Component
+        const FeedModal = ({ isOpen, onClose, title, items, iconColorClass }) => {
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+                    <div 
+                        className="glass-panel w-full max-w-4xl h-[85vh] flex flex-col rounded-2xl overflow-hidden animate-scale-in border border-white/10 shadow-2xl" 
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/40">
+                            <div>
+                                <h2 className="text-2xl font-bold text-white tracking-tight">{title}</h2>
+                                <p className="text-sm text-gray-400 mt-1">Extended Feed ({items.length} items)</p>
+                            </div>
+                            <button 
+                                onClick={onClose}
+                                className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white"
+                            >
+                                <Icon name="x" size={24} />
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="flex-1 overflow-y-auto p-6 scroll-smooth bg-black/20">
+                            <div className="grid gap-3">
+                                {items.map((item, idx) => (
+                                    <a 
+                                        key={idx} 
+                                        href={item.link} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="group p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all duration-200 flex flex-col sm:flex-row gap-4"
+                                    >
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className={`text-[10px] uppercase font-bold tracking-wider bg-black/40 px-2 py-1 rounded ${iconColorClass}`}>
+                                                    {item.source}
+                                                </span>
+                                                <span className="text-xs text-gray-500">
+                                                    {item.pubDate ? new Date(item.pubDate).toLocaleString() : ''}
+                                                </span>
+                                            </div>
+                                            <h4 className="text-lg font-medium text-gray-200 group-hover:text-white leading-snug transition-colors">
+                                                {item.title}
+                                            </h4>
+                                        </div>
+                                        <div className="sm:self-center opacity-0 group-hover:opacity-100 transition-opacity -ml-2 sm:ml-0">
+                                            <Icon name="external-link" size={20} className="text-gray-400" />
+                                        </div>
+                                    </a>
+                                ))}
+                            </div>
+                            <div className="text-center mt-8 pb-4 text-sm text-gray-600">
+                                End of Stream
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const NewsSection = ({ title, type, sources, iconColorClass }) => {
             const [news, setNews] = useState([]);
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(false);
+            const [isExpanded, setIsExpanded] = useState(false);
             const mountedRef = useRef(true);
 
             useEffect(() => {
@@ -193,11 +265,10 @@
                     const fetchWithRetry = async (rssUrl) => {
                         const timestamp = new Date().getTime();
                         
-                        // IMPROVED STRATEGY: Rss2Json is now first priority as it's cleaner for React
                         const strategies = [
                             {
                                 name: 'Rss2Json',
-                                url: `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`,
+                                url: `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&api_key=`, // Free tier usually works fine without key for limited use
                                 type: 'json_rss2json'
                             },
                             {
@@ -225,7 +296,7 @@
                                             link: item.link,
                                             pubDate: item.pubDate,
                                             source: new URL(rssUrl).hostname.replace('www.', '').split('.')[0]
-                                        })); // Return pre-parsed items
+                                        }));
                                     }
                                 }
                                 
@@ -238,7 +309,7 @@
                                 }
 
                                 if (!xmlText || xmlText.length < 50) continue;
-                                return xmlText; // Return text for XML parsing
+                                return xmlText;
                             } catch (e) {
                                 console.warn(`Strategy ${strategy.name} failed for ${rssUrl}`);
                             }
@@ -249,7 +320,7 @@
                     const promises = sources.map(async (url) => {
                         const result = await fetchWithRetry(url);
                         
-                        if (Array.isArray(result)) return result; // It was pre-parsed JSON
+                        if (Array.isArray(result)) return result;
 
                         if (result && typeof result === 'string') {
                             try {
@@ -269,7 +340,8 @@
 
                     try {
                         const results = await Promise.all(promises);
-                        const combined = results.flat().slice(0, 15);
+                        // Increase limit to 60 for expanded view
+                        const combined = results.flat().slice(0, 60);
                         
                         if (mountedRef.current) {
                             setNews(combined);
@@ -294,60 +366,92 @@
             if (type === 'tech') iconName = "cpu";
             if (type === 'business') iconName = "briefcase";
 
+            // Only show top 15 in the dashboard card
+            const displayedNews = news.slice(0, 15);
+
             return (
-                <div className="glass-panel rounded-2xl flex flex-col h-[26rem] overflow-hidden">
-                    <div className="p-4 border-b border-white/10 flex items-center gap-3 bg-black/20">
-                        <div className={`p-2 bg-white/5 rounded-lg ${iconColorClass}`}>
-                            <Icon name={iconName} size={18} />
+                <>
+                    <div className="glass-panel rounded-2xl flex flex-col h-[26rem] overflow-hidden group/panel">
+                        <div className="p-4 border-b border-white/10 flex items-center gap-3 bg-black/20">
+                            <div className={`p-2 bg-white/5 rounded-lg ${iconColorClass}`}>
+                                <Icon name={iconName} size={18} />
+                            </div>
+                            <h2 className="text-sm font-bold uppercase tracking-wider text-gray-200">{title}</h2>
+                            
+                            <div className="ml-auto flex items-center gap-2">
+                                {loading && <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>}
+                                
+                                {/* Maximize Button */}
+                                <button 
+                                    onClick={() => setIsExpanded(true)}
+                                    className="p-1.5 rounded-md hover:bg-white/10 text-gray-500 hover:text-white transition-colors"
+                                    title="Expand Feed"
+                                >
+                                    <Icon name="maximize-2" size={16} />
+                                </button>
+                            </div>
                         </div>
-                        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-200">{title}</h2>
-                        {loading && <div className="ml-auto w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>}
-                    </div>
-                    
-                    <div className="flex-1 overflow-y-auto p-2 scroll-smooth">
-                        {loading && news.length === 0 ? (
-                            <div className="p-4 space-y-4">
-                                {[1,2,3,4].map(i => (
-                                    <div key={i} className="animate-pulse flex gap-3">
-                                        <div className="h-10 w-1 rounded bg-gray-800"></div>
-                                        <div className="flex-1 space-y-2">
-                                            <div className="h-3 bg-gray-800 rounded w-3/4"></div>
-                                            <div className="h-2 bg-gray-800 rounded w-1/2"></div>
+                        
+                        <div className="flex-1 overflow-y-auto p-2 scroll-smooth">
+                            {loading && news.length === 0 ? (
+                                <div className="p-4 space-y-4">
+                                    {[1,2,3,4].map(i => (
+                                        <div key={i} className="animate-pulse flex gap-3">
+                                            <div className="h-10 w-1 rounded bg-gray-800"></div>
+                                            <div className="flex-1 space-y-2">
+                                                <div className="h-3 bg-gray-800 rounded w-3/4"></div>
+                                                <div className="h-2 bg-gray-800 rounded w-1/2"></div>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : error && news.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-gray-500 p-6 text-center">
-                                <Icon name="wifi-off" size={24} className="mb-2 opacity-50" />
-                                <p className="text-sm font-medium">Feed Unavailable</p>
-                                <p className="text-xs mt-1 opacity-70">Sources blocked connection</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-1">
-                                {news.map((item, idx) => (
-                                    <a 
-                                        key={idx} 
-                                        href={item.link} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="group block p-3 rounded-xl hover:bg-white/10 transition-all duration-200 animate-fade-in"
-                                        style={{animationDelay: `${idx * 0.05}s`}}
+                                    ))}
+                                </div>
+                            ) : error && news.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center text-gray-500 p-6 text-center">
+                                    <Icon name="wifi-off" size={24} className="mb-2 opacity-50" />
+                                    <p className="text-sm font-medium">Feed Unavailable</p>
+                                    <p className="text-xs mt-1 opacity-70">Sources blocked connection</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-1">
+                                    {displayedNews.map((item, idx) => (
+                                        <a 
+                                            key={idx} 
+                                            href={item.link} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="group block p-3 rounded-xl hover:bg-white/10 transition-all duration-200 animate-fade-in"
+                                            style={{animationDelay: `${idx * 0.05}s`}}
+                                        >
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <span className={`text-[9px] uppercase font-bold tracking-wider bg-white/5 px-1.5 py-0.5 rounded ${iconColorClass} opacity-80`}>
+                                                    {item.source}
+                                                </span>
+                                            </div>
+                                            <h4 className="text-sm font-medium text-gray-300 group-hover:text-white leading-snug transition-colors">
+                                                {item.title}
+                                            </h4>
+                                        </a>
+                                    ))}
+                                    <button 
+                                        onClick={() => setIsExpanded(true)}
+                                        className="w-full text-center py-3 text-xs text-gray-500 hover:text-white transition-colors uppercase tracking-widest font-bold hover:bg-white/5 rounded-lg mt-2"
                                     >
-                                        <div className="flex items-center gap-2 mb-1.5">
-                                            <span className={`text-[9px] uppercase font-bold tracking-wider bg-white/5 px-1.5 py-0.5 rounded ${iconColorClass} opacity-80`}>
-                                                {item.source}
-                                            </span>
-                                        </div>
-                                        <h4 className="text-sm font-medium text-gray-300 group-hover:text-white leading-snug transition-colors">
-                                            {item.title}
-                                        </h4>
-                                    </a>
-                                ))}
-                            </div>
-                        )}
+                                        View More
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+
+                    {/* Render Modal */}
+                    <FeedModal 
+                        isOpen={isExpanded} 
+                        onClose={() => setIsExpanded(false)} 
+                        title={title} 
+                        items={news} 
+                        iconColorClass={iconColorClass}
+                    />
+                </>
             );
         };
 
